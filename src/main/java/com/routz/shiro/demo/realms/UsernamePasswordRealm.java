@@ -12,7 +12,6 @@ import org.apache.shiro.util.ByteSource;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Base64;
-import java.util.Set;
 
 /**
  *

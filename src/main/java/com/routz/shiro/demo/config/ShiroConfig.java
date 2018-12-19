@@ -43,9 +43,9 @@ public class ShiroConfig {
         filters.put("statelessAuthc", statelessAuthcFilter());
         shiroFilterFactoryBean.setFilters(filters);
 
-        shiroFilterFactoryBean.setLoginUrl("/login/tel");
+        shiroFilterFactoryBean.setLoginUrl("/test/sessionlogin");
         // 登录成功后要跳转的连接
-        shiroFilterFactoryBean.setSuccessUrl("/login/welcome");
+        shiroFilterFactoryBean.setSuccessUrl("/test/unnauth");
         shiroFilterFactoryBean.setUnauthorizedUrl("/error");
 
         // 拦截器
@@ -57,7 +57,11 @@ public class ShiroConfig {
         filterChainDefinitionMap.put("/css/**","anon");
         filterChainDefinitionMap.put("/js/**","anon");
         filterChainDefinitionMap.put("/img/**","anon");
+        // 将想要纳入shiro statelessAuthc管理的放入map
         filterChainDefinitionMap.put("/test/*", "statelessAuthc");
+        // 登录请求需要放行
+        filterChainDefinitionMap.put("/test/sessionlogin", "anon");
+        filterChainDefinitionMap.put("/test/statelesslogin", "anon");
         filterChainDefinitionMap.put("/**", "anon");
         shiroFilterFactoryBean.setFilterChainDefinitionMap(filterChainDefinitionMap);
 //        shiroFilterFactoryBean.setFilterChainDefinitions("/user/*=statelessAuthc");
@@ -112,7 +116,7 @@ public class ShiroConfig {
     @Bean
     public ModularRealmAuthenticator modularRealmAuthenticator(){
         ModularRealmAuthenticator modularRealmAuthenticator=new ModularRealmAuthenticator();
-        // FirstSuccessfulStrategy
+        // 只要有一个realm成功，就放行，并且不继续判断realm
         modularRealmAuthenticator.setAuthenticationStrategy(new FirstSuccessfulStrategy());
         return modularRealmAuthenticator;
     }

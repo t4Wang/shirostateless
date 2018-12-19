@@ -23,7 +23,7 @@ public class StatelessAuthcFilter extends AccessControlFilter {
 
     @Override
     protected boolean isAccessAllowed(ServletRequest request, ServletResponse response, Object mappedValue) {
-        // 电脑端登录
+        // session登录
         Subject subject = getSubject(request, response);
         if (subject.isAuthenticated()) return true;
         return false;
