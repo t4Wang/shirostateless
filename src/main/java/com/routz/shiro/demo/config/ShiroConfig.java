@@ -43,7 +43,7 @@ public class ShiroConfig {
         filters.put("statelessAuthc", statelessAuthcFilter());
         shiroFilterFactoryBean.setFilters(filters);
 
-        shiroFilterFactoryBean.setLoginUrl("/test/sessionlogin");
+        shiroFilterFactoryBean.setLoginUrl("/login/sessionlogin");
         // 登录成功后要跳转的连接
         shiroFilterFactoryBean.setSuccessUrl("/test/unnauth");
         shiroFilterFactoryBean.setUnauthorizedUrl("/error");
@@ -57,11 +57,12 @@ public class ShiroConfig {
         filterChainDefinitionMap.put("/css/**","anon");
         filterChainDefinitionMap.put("/js/**","anon");
         filterChainDefinitionMap.put("/img/**","anon");
+
+        // 登录请求需要放行
+        filterChainDefinitionMap.put("/login/sessionlogin", "anon");
+        filterChainDefinitionMap.put("/login/statelesslogin", "anon");
         // 将想要纳入shiro statelessAuthc管理的放入map
         filterChainDefinitionMap.put("/test/*", "statelessAuthc");
-        // 登录请求需要放行
-        filterChainDefinitionMap.put("/test/sessionlogin", "anon");
-        filterChainDefinitionMap.put("/test/statelesslogin", "anon");
         filterChainDefinitionMap.put("/**", "anon");
         shiroFilterFactoryBean.setFilterChainDefinitionMap(filterChainDefinitionMap);
 //        shiroFilterFactoryBean.setFilterChainDefinitions("/user/*=statelessAuthc");

@@ -1,18 +1,11 @@
 package com.routz.shiro.demo.service;
 
 import com.routz.shiro.demo.domain.User;
-import com.routz.shiro.demo.util.Constants;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authc.*;
 import org.apache.shiro.authz.AuthorizationException;
-import org.apache.shiro.crypto.RandomNumberGenerator;
-import org.apache.shiro.crypto.SecureRandomNumberGenerator;
-import org.apache.shiro.crypto.hash.Sha256Hash;
 import org.apache.shiro.subject.Subject;
-import org.apache.shiro.util.ByteSource;
 import org.springframework.stereotype.Service;
-
-import java.util.Date;
 
 @Service("userService")
 public class UserService {
