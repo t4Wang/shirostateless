@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 参考开涛的加密类，原博客地址：https://jinnianshilongnian.iteye.com/blog/2018398
+ * 参考开涛的加密类
  * <p>User: Zhang Kaitao
  * <p>Date: 14-2-26
  * <p>Version: 1.0

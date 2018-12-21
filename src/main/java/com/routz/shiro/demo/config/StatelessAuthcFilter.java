@@ -13,26 +13,19 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * <p>User: Zhang Kaitao
- * <p>Date: 14-2-26
- * <p>Version: 1.0
- * 在开涛基础上添加判断
- */
 public class StatelessAuthcFilter extends AccessControlFilter {
 
     @Override
     protected boolean isAccessAllowed(ServletRequest request, ServletResponse response, Object mappedValue) {
         // session登录
-        Subject subject = getSubject(request, response);
-        if (subject.isAuthenticated()) return true;
         return false;
     }
 
     @Override
     protected boolean onAccessDenied(ServletRequest request, ServletResponse response) throws IOException {
         // 登录状态判断
-
+        Subject subject = getSubject(request, response);
+        if (subject.isAuthenticated()) return true;
         //1、客户端生成的消息摘要
         String token = request.getParameter(Constants.PARAM_TOKEN);
         //2、客户端传入的用户身份
@@ -52,7 +45,7 @@ public class StatelessAuthcFilter extends AccessControlFilter {
 
         //5、委托给Realm进行登录
         try {
-            getSubject(request, response).login(statelessToken);
+            subject.login(statelessToken);
         } catch (Exception e) {
             e.printStackTrace();
             // AuthenticationException

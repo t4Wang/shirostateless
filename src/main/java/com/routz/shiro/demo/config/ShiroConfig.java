@@ -16,8 +16,6 @@ import org.springframework.context.annotation.Configuration;
 import javax.servlet.Filter;
 import java.util.*;
 
-/**
- */
 @Configuration
 public class ShiroConfig {
 
@@ -51,7 +49,6 @@ public class ShiroConfig {
         // 拦截器
         Map<String,String> filterChainDefinitionMap = new LinkedHashMap<>();
 
-        //我做的是无状态的，这里的东西实际上是用不到的，仅供参考
         //配置退出 过滤器,其中的具体的退出代码Shiro已经替我们实现了
         filterChainDefinitionMap.put("/login/logout", "logout");
         filterChainDefinitionMap.put("/css/**","anon");
@@ -62,10 +59,9 @@ public class ShiroConfig {
         filterChainDefinitionMap.put("/login/sessionlogin", "anon");
         filterChainDefinitionMap.put("/login/statelesslogin", "anon");
         // 将想要纳入shiro statelessAuthc管理的放入map
-        filterChainDefinitionMap.put("/test/*", "statelessAuthc");
-        filterChainDefinitionMap.put("/**", "anon");
+        filterChainDefinitionMap.put("/user/*", "statelessAuthc");
+        filterChainDefinitionMap.put("/test", "anon");
         shiroFilterFactoryBean.setFilterChainDefinitionMap(filterChainDefinitionMap);
-//        shiroFilterFactoryBean.setFilterChainDefinitions("/user/*=statelessAuthc");
         return shiroFilterFactoryBean;
     }
 
