@@ -24,18 +24,90 @@ shiro是一个java服务端控制访问权限的安全框架
 这个demo不适合没有接触过shiro的人员，如果想要了解shiro基础的东西，推荐开涛的shiro的系列博客，地址
 [开涛博客](https://jinnianshilongnian.iteye.com/blog/2018398) 你们看完后会发现我的一些代码也是参考他的。我开始用shiro也是先看文档后看开涛的博客然后又参考了一些别的博客，再自己打断点看shiro源码来摸索的。
 
-# 使用加密token的原理
 
-将前端的参数拼接成一条字符串，使用加密函数加密，将这个加密字符串作为请求签名和之前的参数一起发送到后端，后端收到参数后把请求签名剔除出来，剩下的参数采用和前端相同的加密函数加密，加密后的字符串和请求签名对比是否一样，如果一样服务端就认为这条请求是有效的，就继续放行判断对应的用户是否有权限访问
+# shiro访问步骤
 
-这样即使别人截获正常用户的请求想要做自己的不当用途，他的参数加密后和签名字符串不匹配的话访问就会失败，一定程度上的排除了恶意用户
+shiro的访问步骤是这样的，访问一个url
 
-为了增加安全性，可以选择加服务端提供的随机字符串和时间戳和其他参数同时加密，我只是在服务端加了随机字符串
+1. 到 shiro 的 PathMatchingFilter preHandle 方法判断一个请求的访问权限是可以直接放行还是需要 shiro 自己实现的AccessControlFilter 来处理访问请求
+2. 假设到了 AccessControlFilter 实现类，首先在 isAccessAllowed 判断是否可以访问，如果可以则直接放行访问，如果不可以则到 onAccessDenied 方法处理，调用 realm doGetAuthenticationInfo 授权并继续调用 realm doGetAuthorizationInfo 鉴权判断是否有足够的权限来访问
+3. 假设有足够的权限的话就访问到自己定义的 controller了
+
+一次shiro处理的流程大致就是这样
+
+# shiro开发步骤
+
+原本shiro默认只支持session登录，不支持无状态形式的访问请求，只能做到阻止未登录用户访问需要访问权限的url，不符合我的需求。
+
+要改的话就要看有没有一个东西来改变根据session控制访问逻辑。
+
+可以实现 AccessControlFilter 来修改控制访问的逻辑
+
+要做的有下面几方面
+* [自定义实现AccessControlFilter （StatelessAuthcFilter）](#自定义实现AccessControlFilter)
+* [shiro的过滤链上添加自定义的filter](#shiro的过滤链上添加自定义的filter)
+* [自定义一个token（TokenRealm），存储参数和加密参数等](#自定义一个token)
+* [自定义realm，不用账户密码登录授权（UsernamePasswordToken），而使用自定义的token传入加密字符串判断授权](#自定义realm)
+
+## 自定义实现AccessControlFilter
+
+AccessControlFilter有两个抽象接口，isAccessAllowed 和 onAccessDenied，如果isAccessAllowed返回true的话，就不会再判断用户是否有权限，所以isAccessAllowed直接返回false，在 onAccessDenied 方法里处理请求。
+
+``` java
+    @Override
+    protected boolean onAccessDenied(ServletRequest request, ServletResponse response) throws IOException {
+        // 登录状态判断
+        Subject subject = getSubject(request, response);
+        if (subject.isAuthenticated()) return true;
+        //1、客户端生成的消息摘要
+        String token = request.getParameter(Constants.PARAM_TOKEN);
+        //2、客户端传入的用户身份
+        String userId = request.getParameter(Constants.PARAM_USER_ID);
+
+        if (!StringUtils.hasText(token) || !StringUtils.hasText(userId)) {
+            return false;
+        }
+
+        //3、客户端请求的参数列表
+        Map<String, String[]> params = new HashMap<>(request.getParameterMap());
+        params.remove(Constants.PARAM_TOKEN);
+
+        // 生成无状态Token
+        StatelessToken statelessToken = new StatelessToken(userId, params, token);
+        // 如果不执行登录会判断没有授权，直接退出
+
+        //5、委托给Realm进行登录
+        try {
+            subject.login(statelessToken);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+        return true;
+    }
+```
+
+首先处理session登录方式的，*onAccessDenied* 方法有两个参数 *ServletRequest request, ServletResponse response*
+用这两个参数可以获取subject，
+``` java
+Subject subject = getSubject(request, response);
+if (subject.isAuthenticated()) return true;
+```
+如果已经登录，直接放行，就会继续鉴权，如果没有session信息，就继续向下判断是不是无状态方式的访问。
+
+将请求参数填充自定义的 **StatelessToken** ，使用
+``` java
+subject.login(statelessToken);
+```
+让shiro调用自定义的 **TokenRealm** 来进行授权，授权通过的话，就和session登录的方式一样继续鉴权。
 
 
-# 要怎么改
+## shiro的过滤链上添加自定义的filter
 
-原本shiro默认只支持session登录，不支持无状态形式的访问请求，访问服务器的时候如果没登录只能
+
+## 自定义一个token
+## 自定义realm
+进入 ModularRealmAuthenticator doMultiRealmAuthentication 
 
 首先在配置类中配置要纳入过滤范围的控制类
 ```java
@@ -75,6 +147,17 @@ shiro是一个java服务端控制访问权限的安全框架
 ```
 所有访问的请求都会被拦截并进入PathMatchingFilter preHandle，将放入filterChainDefinitionMap的pattern字符串取出和请求地址匹配。
 
+
+# 使用加密token的原理
+
+将前端的参数拼接成一条字符串，使用加密函数加密，将这个加密字符串作为请求签名和之前的参数一起发送到后端，后端收到参数后把请求签名剔除出来，剩下的参数采用和前端相同的加密函数加密，加密后的字符串和请求签名对比是否一样，如果一样服务端就认为这条请求是有效的，就继续放行判断对应的用户是否有权限访问
+
+这样即使别人截获正常用户的请求想要做自己的不当用途，他的参数加密后和签名字符串不匹配的话访问就会失败，一定程度上的排除了恶意用户
+
+为了增加安全性，可以选择加服务端提供的随机字符串和时间戳和其他参数同时加密，我只是在服务端加了随机字符串
+
+# 测试
+
 接下来分别测试请求
 1. 不在这个map里的请求地址
 2. 在这个map里，过滤器anon（可以访问）的url
@@ -85,6 +168,7 @@ shiro是一个java服务端控制访问权限的安全框架
 7. 按自定义加密规则无状态化访问不需要访问权限的请求
 8. 按自定义加密规则无状态化访问不需要访问权限的请求
 
+# 步骤说明
 
 有cookie记录登录状态的登录
 
