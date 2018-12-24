@@ -25,15 +25,19 @@ shiro是一个java服务端控制访问权限的安全框架
 [开涛博客](https://jinnianshilongnian.iteye.com/blog/2018398) 你们看完后会发现我的一些代码也是参考他的。我开始用shiro也是先看文档后看开涛的博客然后又参考了一些别的博客，再自己打断点看shiro源码来摸索的。
 
 
-# shiro访问步骤
+# shiro默认访问步骤
 
-shiro的访问步骤是这样的，访问一个url
+shiro访问一个普通的url步骤大致是这样的
 
 1. 到 shiro 的 PathMatchingFilter preHandle 方法判断一个请求的访问权限是可以直接放行还是需要 shiro 自己实现的AccessControlFilter 来处理访问请求
-2. 假设到了 AccessControlFilter 实现类，首先在 isAccessAllowed 判断是否可以访问，如果可以则直接放行访问，如果不可以则到 onAccessDenied 方法处理，调用 realm doGetAuthenticationInfo 授权并继续调用 realm doGetAuthorizationInfo 鉴权判断是否有足够的权限来访问
+2. 假设到了 AccessControlFilter 实现类，首先在 isAccessAllowed 判断是否可以访问，如果可以则直接放行访问，如果不可以则到 onAccessDenied 方法处理，并继续调用 realm doGetAuthorizationInfo 鉴权判断是否有足够的权限来访问
 3. 假设有足够的权限的话就访问到自己定义的 controller了
 
-一次shiro处理的流程大致就是这样
+如果这个url是登录请求的话，
+那接下来：
+
+4. 在你自己的代码里会写到获取shiro的Subject，创建一个token，通常是UsernamePasswordToken，将请求参数的账户密码填充进去，然后调用subject.login(token)
+5. 接下来到支持处理这个token的realm中调用 realm doGetAuthenticationInfo 授权，授权后，session中就存有你的登录信息了
 
 # shiro开发步骤
 
@@ -46,46 +50,12 @@ shiro的访问步骤是这样的，访问一个url
 要做的有下面几方面
 * [自定义实现AccessControlFilter （StatelessAuthcFilter）](#自定义实现AccessControlFilter)
 * [shiro的过滤链上添加自定义的filter](#shiro的过滤链上添加自定义的filter)
-* [自定义一个token（TokenRealm），存储参数和加密参数等](#自定义一个token)
 * [自定义realm，不用账户密码登录授权（UsernamePasswordToken），而使用自定义的token传入加密字符串判断授权](#自定义realm)
+* [自定义一个token（TokenRealm），存储参数和加密参数等](#自定义一个token)
 
 ## 自定义实现AccessControlFilter
 
-AccessControlFilter有两个抽象接口，isAccessAllowed 和 onAccessDenied，如果isAccessAllowed返回true的话，就不会再判断用户是否有权限，所以isAccessAllowed直接返回false，在 onAccessDenied 方法里处理请求。
-
-``` java
-    @Override
-    protected boolean onAccessDenied(ServletRequest request, ServletResponse response) throws IOException {
-        // 登录状态判断
-        Subject subject = getSubject(request, response);
-        if (subject.isAuthenticated()) return true;
-        //1、客户端生成的消息摘要
-        String token = request.getParameter(Constants.PARAM_TOKEN);
-        //2、客户端传入的用户身份
-        String userId = request.getParameter(Constants.PARAM_USER_ID);
-
-        if (!StringUtils.hasText(token) || !StringUtils.hasText(userId)) {
-            return false;
-        }
-
-        //3、客户端请求的参数列表
-        Map<String, String[]> params = new HashMap<>(request.getParameterMap());
-        params.remove(Constants.PARAM_TOKEN);
-
-        // 生成无状态Token
-        StatelessToken statelessToken = new StatelessToken(userId, params, token);
-        // 如果不执行登录会判断没有授权，直接退出
-
-        //5、委托给Realm进行登录
-        try {
-            subject.login(statelessToken);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
-        }
-        return true;
-    }
-```
+自定义的filter继承AccessControlFilter类，主要改变了session登录判断是否登录的方式。AccessControlFilter有两个抽象接口，isAccessAllowed 和 onAccessDenied，如果isAccessAllowed返回true的话，就不会再判断用户是否有权限，所以isAccessAllowed直接返回false，在 onAccessDenied 方法里处理请求。
 
 首先处理session登录方式的，*onAccessDenied* 方法有两个参数 *ServletRequest request, ServletResponse response*
 用这两个参数可以获取subject，
@@ -101,15 +71,10 @@ subject.login(statelessToken);
 ```
 让shiro调用自定义的 **TokenRealm** 来进行授权，授权通过的话，就和session登录的方式一样继续鉴权。
 
-
 ## shiro的过滤链上添加自定义的filter
 
+自定义实现的filter需要在自定义的shiro java config 类到ShiroFilterFactoryBean先注册一个名字，然后在用这个名字添加到filterChainDefinitionMap去（如果只想用session登录的方式的话，不用自定义的filter，只需在filterChainDefinitionMap添加"auth"， 不需要控制权限的url添加"anon"就行）
 
-## 自定义一个token
-## 自定义realm
-进入 ModularRealmAuthenticator doMultiRealmAuthentication 
-
-首先在配置类中配置要纳入过滤范围的控制类
 ```java
     @Bean
     public ShiroFilterFactoryBean shiroFilter(DefaultWebSecurityManager securityManager) {
@@ -121,19 +86,11 @@ subject.login(statelessToken);
         filters.put("statelessAuthc", statelessAuthcFilter());
         shiroFilterFactoryBean.setFilters(filters);
 
-        shiroFilterFactoryBean.setLoginUrl("/login/sessionlogin");
-        // 登录成功后要跳转的连接
-        shiroFilterFactoryBean.setSuccessUrl("/test/unnauth");
-        shiroFilterFactoryBean.setUnauthorizedUrl("/error");
-
         // 拦截器
         Map<String,String> filterChainDefinitionMap = new LinkedHashMap<>();
 
         //配置退出 过滤器,其中的具体的退出代码Shiro已经替我们实现了
         filterChainDefinitionMap.put("/login/logout", "logout");
-        filterChainDefinitionMap.put("/css/**","anon");
-        filterChainDefinitionMap.put("/js/**","anon");
-        filterChainDefinitionMap.put("/img/**","anon");
 
         // 登录请求需要放行
         filterChainDefinitionMap.put("/login/sessionlogin", "anon");
@@ -145,10 +102,68 @@ subject.login(statelessToken);
         return shiroFilterFactoryBean;
     }
 ```
-所有访问的请求都会被拦截并进入PathMatchingFilter preHandle，将放入filterChainDefinitionMap的pattern字符串取出和请求地址匹配。
+statelessAuthcFilter 是我的AccessControlFilter实现类。
+在访问时，所有访问的请求都会被拦截并进入PathMatchingFilter preHandle，将放入filterChainDefinitionMap的pattern字符串取出和请求地址匹配。
+
+## 自定义realm
+
+有多个realm的话，在config里配置ModularRealmAuthenticator，将自己的realm添加进去。
+在用到realm的时候，进入 ModularRealmAuthenticator doMultiRealmAuthentication 判断使用哪个realm。
+首先调用
+```java
+public boolean supports(AuthenticationToken token)
+```
+判断这个realm是否支持，返回false的话shiro就不在这个realm上浪费时间了。调用完realm会根据配置时使用的调用策略来处理调用逻辑（是否继续调用，访问是否放行等）
+
+有两个地方会调用到realm。一个是shiro 的 subject 调用login方法，根据token类型不同，会调用不同的realm的doGetAuthenticationInfo来授权；一个是调用AccessControlFilter实现类的onAccessDenied之后，如果判断用户可以继续访问就会继续调用realm的doGetAuthorizationInfo鉴权。
+
+* 鉴权 doGetAuthorizationInfo：
+
+    从数据库或缓存读取用户身份信息，判断用户是否有访问这个资源的权限，这个所有realm处理逻辑都一样
+
+* 授权 doGetAuthenticationInfo
+
+    session登录方式的授权只需要从数据库或缓存读取用户身份信息，判断密码是否正确，然后授权即可，无状态的登录方式需要[使用加密token](#使用加密token的原理) 授权。
+
+## 自定义一个token
+
+如果是账号密码登录的话，用shiro的UsernamePasswordToken就可以，但是因为需要在statelessAuthcFilter中调用login判断是否可以访问，所以需要增加一个支持自定义realm授权的token，这个token存储请求参数，用于tokenRealm授权对比前端加密token。
+
+# 测试
+
+接下来分别测试请求
+
+1. 不在config类filterChainDefinitionMap里的请求地址
+
+![this.appliedPaths](readme/shiro8.png)
+
+2. 在这个map里，过滤器anon（可以访问）的url
+
+![this.appliedPaths](readme/shiro1.png)
+
+3. 在这个map里，自定义shiro过滤器statelessAuthc的url（不需要user权限）
+
+![this.appliedPaths](readme/shiro2.png)
+
+4. 在这个map里，自定义shiro过滤器statelessAuthc的url（需要user权限）
 
 
-# 使用加密token的原理
+
+5. session登录后访问不需要访问权限的请求
+
+![this.appliedPaths](readme/shiro4.png)
+
+6. session登录后访问需要user权限的请求
+
+
+
+7. 按自定义加密规则无状态化访问不需要user权限的请求
+
+8. 按自定义加密规则无状态化访问需要user权限的请求
+
+---
+
+### 使用加密token的原理
 
 将前端的参数拼接成一条字符串，使用加密函数加密，将这个加密字符串作为请求签名和之前的参数一起发送到后端，后端收到参数后把请求签名剔除出来，剩下的参数采用和前端相同的加密函数加密，加密后的字符串和请求签名对比是否一样，如果一样服务端就认为这条请求是有效的，就继续放行判断对应的用户是否有权限访问
 
@@ -156,68 +171,3 @@ subject.login(statelessToken);
 
 为了增加安全性，可以选择加服务端提供的随机字符串和时间戳和其他参数同时加密，我只是在服务端加了随机字符串
 
-# 测试
-
-接下来分别测试请求
-1. 不在这个map里的请求地址
-2. 在这个map里，过滤器anon（可以访问）的url
-3. 在这个map里，自定义shiro过滤器statelessAuthc的url（不需要访问权限）
-4. 在这个map里，自定义shiro过滤器statelessAuthc的url（需要访问权限）
-5. session登录后访问不需要访问权限的请求
-6. session登录后访问需要user权限的请求
-7. 按自定义加密规则无状态化访问不需要访问权限的请求
-8. 按自定义加密规则无状态化访问不需要访问权限的请求
-
-# 步骤说明
-
-有cookie记录登录状态的登录
-
-1. 访问controller登录
-
-2. controller根据传过来的参数判断身份
-
-    账号密码登录
-    构造UsernamePasswordToken,
-    调用SecurityUtils.getSubject()获取subject
-    调用subject.login(token)
-
-3. UsernamePasswordRealm处理登录授权请求
-
-    ModularRealmAuthenticator 遍历在 securityManager 注册的所有 realm ,调用 support 判断 Token 是否是支持的类型
-    UsernamePasswordRealm 支持
-    调用 UsernamePasswordRealm 的 doGetAuthenticationInfo 方法
-    数据库查询账号密码，封装进info，返回，
-    进入父类AuthenticationRealm assertCredentialsMatch方法info与token比对
-    比对通过就通过校验
-
-登录过后访问请求
-
-先到达statelessAuthcFilter isAccessAllowed方法，直接返回false就会继续调用这个类的onAccessDenied方法，获取subject后判断登录过，就返回true，进入PathMatchingFilter preHandle，到达请求的方法
-
-进入这个方法判断要不要进过滤器过滤
-```java
-protected boolean preHandle(ServletRequest request, ServletResponse response) throws Exception {
-
-        if (this.appliedPaths == null || this.appliedPaths.isEmpty()) {
-            if (log.isTraceEnabled()) {
-                log.trace("appliedPaths property is null or empty.  This Filter will passthrough immediately.");
-            }
-            return true;
-        }
-
-        for (String path : this.appliedPaths.keySet()) {
-            // If the path does match, then pass on to the subclass implementation for specific checks
-            //(first match 'wins'):
-            if (pathsMatch(path, request)) {
-                log.trace("Current requestURI matches pattern '{}'.  Determining filter chain execution...", path);
-                Object config = this.appliedPaths.get(path);
-                return isFilterChainContinued(request, response, path, config);
-            }
-        }
-
-        //no path matched, allow the request to go through:
-        return true;
-    }
-```
-
-![this.appliedPaths](readme/shiro5.png)
