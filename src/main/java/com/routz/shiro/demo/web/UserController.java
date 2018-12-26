@@ -14,14 +14,14 @@ public class UserController {
      * 不需要权限，但是需要session登录，或者带有token
      */
     @RequestMapping("/unnauth")
-    public String unnauth() {
-        return "不需要访问权限的请求";
+    public String unnauth(String userId) {
+        return "不需要访问权限的请求" + userId;
     }
 
     @RequestMapping("/nauth")
     @RequiresPermissions("user:book")
     public String nauth(String userId) {
-        return "需要访问权限的请求";
+        return "需要访问权限的请求" + userId;
     }
 
     @Autowired

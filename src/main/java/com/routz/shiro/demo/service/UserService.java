@@ -1,6 +1,7 @@
 package com.routz.shiro.demo.service;
 
 import com.routz.shiro.demo.domain.User;
+import com.routz.shiro.demo.util.HmacSHA256Utils;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authc.*;
 import org.apache.shiro.authz.AuthorizationException;
@@ -11,13 +12,13 @@ import org.springframework.stereotype.Service;
 public class UserService {
 
     public String auth(String userId) {
-        if ("123".equals(userId))
-            return "book";
+        if ("002101".equals(userId))
+            return "user:book";
         return null;
     }
 
     public String role(String userId) {
-        if ("123".equals(userId))
+        if ("002101".equals(userId))
             return "user";
         return null;
     }
@@ -35,22 +36,21 @@ public class UserService {
      * 账号密码登录
      * @param userId
      * @param password
+     * @return key 参数加密使用的key
      */
-    public void login(String userId, String password) {
+    public String login(String userId, String password) {
         Subject currentUser = SecurityUtils.getSubject();
+        // 模拟从数据库取用户数据
+        User udb = this.user(userId);
+        if (udb == null) throw new AuthorizationException("账户不存在");
+        String key = HmacSHA256Utils.getKey(userId);
 
         if (!currentUser.isAuthenticated()) {
-            // 根据手机号从数据库获取用户
-            // 模拟从数据库取用户数据
-            User udb = this.user(userId);
-            if (udb == null) throw new AuthorizationException("账户不存在");
-
             UsernamePasswordToken token = new UsernamePasswordToken(udb.getUserId(), password, udb.getSalt());
             token.setRememberMe(true);
 
             try {
                 currentUser.login(token);
-
                 // 更新手机盐值
                 // 将盐插入数据库
                 // 根据密码 盐值生成新加密密码
@@ -69,5 +69,6 @@ public class UserService {
                 throw new AuthorizationException("未知权限校验错误");
             }
         }
+        return key;
     }
 }

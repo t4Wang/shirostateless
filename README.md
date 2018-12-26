@@ -30,14 +30,14 @@ shiro是一个java服务端控制访问权限的安全框架
 shiro访问一个普通的url步骤大致是这样的
 
 1. 到 shiro 的 PathMatchingFilter preHandle 方法判断一个请求的访问权限是可以直接放行还是需要 shiro 自己实现的AccessControlFilter 来处理访问请求
-2. 假设到了 AccessControlFilter 实现类，首先在 isAccessAllowed 判断是否可以访问，如果可以则直接放行访问，如果不可以则到 onAccessDenied 方法处理，并继续调用 realm doGetAuthorizationInfo 鉴权判断是否有足够的权限来访问
+2. 假设到了 AccessControlFilter 实现类，首先在 isAccessAllowed 判断是否可以访问，如果可以则直接放行访问，如果不可以则到 onAccessDenied 方法处理，并继续调用 realm doGetAuthorizationInfo 授权判断是否有足够的权限来访问
 3. 假设有足够的权限的话就访问到自己定义的 controller了
 
 如果这个url是登录请求的话，
 那接下来：
 
 4. 在你自己的代码里会写到获取shiro的Subject，创建一个token，通常是UsernamePasswordToken，将请求参数的账户密码填充进去，然后调用subject.login(token)
-5. 接下来到支持处理这个token的realm中调用 realm doGetAuthenticationInfo 授权，授权后，session中就存有你的登录信息了
+5. 接下来到支持处理这个token的realm中调用 realm doGetAuthenticationInfo 鉴权，鉴权后，session中就存有你的登录信息了
 
 # shiro开发步骤
 
@@ -50,7 +50,7 @@ shiro访问一个普通的url步骤大致是这样的
 要做的有下面几方面
 * [自定义实现AccessControlFilter （StatelessAuthcFilter）](#自定义实现AccessControlFilter)
 * [shiro的过滤链上添加自定义的filter](#shiro的过滤链上添加自定义的filter)
-* [自定义realm，不用账户密码登录授权（UsernamePasswordToken），而使用自定义的token传入加密字符串判断授权](#自定义realm)
+* [自定义realm，不用账户密码登录鉴权（UsernamePasswordToken），而使用自定义的token传入加密字符串判断鉴权](#自定义realm)
 * [自定义一个token（TokenRealm），存储参数和加密参数等](#自定义一个token)
 
 ## 自定义实现AccessControlFilter
@@ -63,13 +63,13 @@ shiro访问一个普通的url步骤大致是这样的
 Subject subject = getSubject(request, response);
 if (subject.isAuthenticated()) return true;
 ```
-如果已经登录，直接放行，就会继续鉴权，如果没有session信息，就继续向下判断是不是无状态方式的访问。
+如果已经登录，直接放行，就会继续授权，如果没有session信息，就继续向下判断是不是无状态方式的访问。
 
 将请求参数填充自定义的 **StatelessToken** ，使用
 ``` java
 subject.login(statelessToken);
 ```
-让shiro调用自定义的 **TokenRealm** 来进行授权，授权通过的话，就和session登录的方式一样继续鉴权。
+让shiro调用自定义的 **TokenRealm** 来进行鉴权，鉴权通过的话，就和session登录的方式一样继续授权。
 
 ## shiro的过滤链上添加自定义的filter
 
@@ -115,19 +115,19 @@ public boolean supports(AuthenticationToken token)
 ```
 判断这个realm是否支持，返回false的话shiro就不在这个realm上浪费时间了。调用完realm会根据配置时使用的调用策略来处理调用逻辑（是否继续调用，访问是否放行等）
 
-有两个地方会调用到realm。一个是shiro 的 subject 调用login方法，根据token类型不同，会调用不同的realm的doGetAuthenticationInfo来授权；一个是调用AccessControlFilter实现类的onAccessDenied之后，如果判断用户可以继续访问就会继续调用realm的doGetAuthorizationInfo鉴权。
+有两个地方会调用到realm。一个是shiro 的 subject 调用login方法，根据token类型不同，会调用不同的realm的doGetAuthenticationInfo来鉴权；一个是调用AccessControlFilter实现类的onAccessDenied之后，如果判断用户可以继续访问就会继续调用realm的doGetAuthorizationInfo授权。
 
-* 鉴权 doGetAuthorizationInfo：
+* 授权 doGetAuthorizationInfo：
 
     从数据库或缓存读取用户身份信息，判断用户是否有访问这个资源的权限，这个所有realm处理逻辑都一样
 
-* 授权 doGetAuthenticationInfo
+* 鉴权 doGetAuthenticationInfo
 
-    session登录方式的授权只需要从数据库或缓存读取用户身份信息，判断密码是否正确，然后授权即可，无状态的登录方式需要[使用加密token](#使用加密token的原理) 授权。
+    session登录方式的鉴权只需要从数据库或缓存读取用户身份信息，判断密码是否正确，然后鉴权即可，无状态的登录方式需要[使用加密token](#使用加密token的原理) 鉴权。
 
 ## 自定义一个token
 
-如果是账号密码登录的话，用shiro的UsernamePasswordToken就可以，但是因为需要在statelessAuthcFilter中调用login判断是否可以访问，所以需要增加一个支持自定义realm授权的token，这个token存储请求参数，用于tokenRealm授权对比前端加密token。
+如果是账号密码登录的话，用shiro的UsernamePasswordToken就可以，但是因为需要在statelessAuthcFilter中调用login判断是否可以访问，所以需要增加一个支持自定义realm鉴权的token，这个token存储请求参数，用于tokenRealm鉴权对比前端加密token。
 
 # 测试
 
@@ -141,25 +141,25 @@ public boolean supports(AuthenticationToken token)
 
 ![this.appliedPaths](readme/shiro1.png)
 
-3. 在这个map里，自定义shiro过滤器statelessAuthc的url（不需要user权限）
+3. 在这个map里，自定义shiro过滤器statelessAuthc的url
 
 ![this.appliedPaths](readme/shiro2.png)
 
-4. 在这个map里，自定义shiro过滤器statelessAuthc的url（需要user权限）
-
-
-
-5. session登录后访问不需要访问权限的请求
+4. session登录后访问不需要访问权限的请求
 
 ![this.appliedPaths](readme/shiro4.png)
 
-6. session登录后访问需要user权限的请求
+5. session登录后访问需要user权限的请求
 
+![this.appliedPaths](readme/shiro10.png)
 
+6. 按自定义加密规则无状态化访问不需要user权限的请求
 
-7. 按自定义加密规则无状态化访问不需要user权限的请求
+![this.appliedPaths](readme/shiro11.png)
 
-8. 按自定义加密规则无状态化访问需要user权限的请求
+7. 按自定义加密规则无状态化访问需要user权限的请求
+
+![this.appliedPaths](readme/shiro12.png)
 
 ---
 

@@ -27,20 +27,21 @@ public class StatelessAuthcFilter extends AccessControlFilter {
         Subject subject = getSubject(request, response);
         if (subject.isAuthenticated()) return true;
         //1、客户端生成的消息摘要
-        String token = request.getParameter(Constants.PARAM_TOKEN);
-        //2、客户端传入的用户身份
-        String userId = request.getParameter(Constants.PARAM_USER_ID);
+        String signature = request.getParameter(Constants.PARAM_SIGNATURE);
+        //2、客户端传入的userId
+        String userId = request.getParameter(Constants.PARAM_USER);
 
-        if (!StringUtils.hasText(token) || !StringUtils.hasText(userId)) {
+        if (!StringUtils.hasText(signature) || !StringUtils.hasText(userId)) {
+            onLoginFail(response);
             return false;
         }
 
         //3、客户端请求的参数列表
         Map<String, String[]> params = new HashMap<>(request.getParameterMap());
-        params.remove(Constants.PARAM_TOKEN);
+        params.remove(Constants.PARAM_SIGNATURE);
 
         // 生成无状态Token
-        StatelessToken statelessToken = new StatelessToken(userId, params, token);
+        StatelessToken statelessToken = new StatelessToken(userId, params, signature);
         // 如果不执行登录会判断没有授权，直接退出
 
         //5、委托给Realm进行登录

@@ -9,7 +9,6 @@ import org.apache.shiro.authc.AuthenticationToken;
 import org.apache.shiro.authc.SimpleAuthenticationInfo;
 import org.apache.shiro.authz.AuthorizationInfo;
 import org.apache.shiro.authz.SimpleAuthorizationInfo;
-import org.apache.shiro.crypto.hash.Sha256Hash;
 import org.apache.shiro.realm.AuthorizingRealm;
 import org.apache.shiro.subject.PrincipalCollection;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,21 +53,16 @@ public class TokenRealm extends AuthorizingRealm {
     @Override
     protected AuthenticationInfo doGetAuthenticationInfo(AuthenticationToken token) throws AuthenticationException {
         StatelessToken statelessToken = (StatelessToken) token;
-        String userId = statelessToken.getUsername();
-        String key = getKey(userId); //根据用户名获取密钥（和客户端的一样）
+        String userId = statelessToken.getPreKey();
+        String key = HmacSHA256Utils.getKey(userId);    //根据用户名获取密钥（和客户端的一样）
         //在服务器端生成客户端参数消息摘要
         String serverDigest = HmacSHA256Utils.digest(key, statelessToken.getParams());
-        System.out.println(statelessToken.getToken());
+        System.out.println(statelessToken.getSignature());
         //然后进行客户端消息摘要和服务器端消息摘要的匹配
         return new SimpleAuthenticationInfo(
                 userId,
                 serverDigest,
                 getName());
-    }
-
-    private String getKey(String username) {
-        String hashedPasswordBase64 = new Sha256Hash(username).toBase64();
-        return hashedPasswordBase64;
     }
 
     @Autowired

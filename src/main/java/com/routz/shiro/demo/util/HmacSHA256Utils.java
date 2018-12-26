@@ -1,6 +1,7 @@
 package com.routz.shiro.demo.util;
 
 import org.apache.commons.codec.binary.Hex;
+import org.apache.shiro.crypto.hash.Sha256Hash;
 
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
@@ -61,6 +62,11 @@ public class HmacSHA256Utils {
         }
 
         return digest(key, s.toString());
+    }
+
+    public static String getKey(String keyStr) {
+        String hashedPasswordBase64 = new Sha256Hash(keyStr).toBase64();
+        return hashedPasswordBase64;
     }
 
 }

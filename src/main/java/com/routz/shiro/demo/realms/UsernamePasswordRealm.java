@@ -52,7 +52,7 @@ public class UsernamePasswordRealm extends AuthorizingRealm {
      */
     @Override
     protected AuthorizationInfo doGetAuthorizationInfo(PrincipalCollection principals) {
-        System.out.println("用户名密码 授权验证");
+        System.out.println("用户名密码 验证");
         //获取当前登录输入的用户名，等价于(String) principalCollection.fromRealm(getName()).iterator().next();
         String userId = (String) super.getAvailablePrincipal(principals);
 
@@ -68,11 +68,11 @@ public class UsernamePasswordRealm extends AuthorizingRealm {
     }
 
     /**
-     * 登录验证
+     * 鉴权验证
      */
     @Override
     protected AuthenticationInfo doGetAuthenticationInfo(AuthenticationToken token) throws AuthenticationException {
-        System.out.println("登录验证");
+        System.out.println("鉴权验证");
         // UsernamePasswordToken对象用来存放提交的登录信息
         UsernamePasswordToken upt = (UsernamePasswordToken) token;
         // 使用user_id

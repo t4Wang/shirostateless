@@ -4,29 +4,24 @@ import org.apache.shiro.authc.AuthenticationToken;
 
 import java.util.Map;
 
-/**
- * <p>User: Zhang Kaitao
- * <p>Date: 14-2-26
- * <p>Version: 1.0
- */
 public class StatelessToken implements AuthenticationToken {
 
-    private String username;
+    private String preKey;
     private Map<String, ?> params;
-    private String token;
+    private String signature;
 
-    public StatelessToken(String username,  Map<String, ?> params, String token) {
-        this.username = username;
+    public StatelessToken(String preKey, Map<String, ?> params, String signature) {
+        this.preKey = preKey;
         this.params = params;
-        this.token = token;
+        this.signature = signature;
     }
 
-    public String getUsername() {
-        return username;
+    public String getPreKey() {
+        return preKey;
     }
 
-    public void setUsername(String username) {
-        this.username = username;
+    public void setPreKey(String preKey) {
+        this.preKey = preKey;
     }
 
     public  Map<String, ?> getParams() {
@@ -37,21 +32,21 @@ public class StatelessToken implements AuthenticationToken {
         this.params = params;
     }
 
-    public String getToken() {
-        return token;
+    public String getSignature() {
+        return signature;
     }
 
-    public void setToken(String token) {
-        this.token = token;
+    public void setSignature(String signature) {
+        this.signature = signature;
     }
 
     @Override
     public Object getPrincipal() {
-        return username;
+        return preKey;
     }
 
     @Override
     public Object getCredentials() {
-        return token;
+        return signature;
     }
 }
